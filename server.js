@@ -2,9 +2,13 @@ const express = require('express');
 const corsAnywhere = require('cors-anywhere');
 
 const app = express();
-const proxy = corsAnywhere.createServer({
-  originWhitelist: ['https://steniorochac-sudo.github.io'], // Seu domínio
-});
 
-app.use('/', proxy);
-app.listen(process.env.PORT || 8080, () => console.log('Proxy CORS rodando'));
+// Configura o middleware do cors-anywhere
+app.use(corsAnywhere({
+  originWhitelist: ['https://steniorochac-sudo.github.io'], // Permite apenas seu domínio
+  requireHeader: ['origin', 'x-requested-with'],
+  removeHeaders: ['cookie', 'cookie2']
+}));
+
+// Exporta para Vercel como função serverless
+module.exports = app;
