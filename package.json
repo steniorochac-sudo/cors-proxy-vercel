@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "main": "server.js",
   "dependencies": {
-    "express": "^4.17.1",
-    "cors-anywhere": "^0.4.4"
+    "node-fetch": "^3.3.2"
   }
 }
