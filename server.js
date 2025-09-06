@@ -1,46 +1,81 @@
 module.exports = async (req, res) => {
-  // Configurar CORS headers
+  // Headers CORS mais permissivos
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Max-Age', '86400');
 
-  // Handle preflight requests
+  // Handle preflight
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
 
   try {
-    // Extrair a URL do target da query string ou path
-    const targetUrl = req.url.replace(/^\/+/, ''); // Remove barras iniciais
+    // Parse da URL target
+    let targetUrl = req.url.substring(1); // Remove primeira barra
     
-    if (!targetUrl || !targetUrl.startsWith('http')) {
-      return res.status(400).json({ error: 'URL de destino inválida' });
+    // Se não começar com http, assume que é inválida
+    if (!targetUrl.startsWith('http')) {
+      return res.status(400).json({ 
+        error: 'URL inválida', 
+        received: targetUrl,
+        expected: 'https://...' 
+      });
     }
 
-    // Preparar headers para o request
-    const headers = {
-      'Content-Type': req.headers['content-type'] || 'application/json',
+    console.log('Target URL:', targetUrl);
+
+    // Import dinâmico do node-fetch
+    const fetch = (await import('node-fetch')).default;
+
+    // Preparar o request
+    const options = {
+      method: req.method,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; CORS-Proxy/1.0)',
+        'Accept': '*/*',
+      },
+      redirect: 'follow', // Seguir redirecionamentos
+      follow: 10 // Máximo 10 redirecionamentos
     };
 
-    // Fazer o request para o target
-    const fetch = (await import('node-fetch')).default;
-    const response = await fetch(targetUrl, {
-      method: req.method,
-      headers: headers,
-      body: req.method === 'POST' ? JSON.stringify(req.body) : undefined,
-    });
+    // Se for POST, adicionar o body
+    if (req.method === 'POST' && req.body) {
+      options.headers['Content-Type'] = 'application/json';
+      options.body = JSON.stringify(req.body);
+    }
 
-    const data = await response.text();
+    console.log('Making request to:', targetUrl);
+    console.log('Options:', options);
+
+    // Fazer o request
+    const response = await fetch(targetUrl, options);
     
-    // Retornar a resposta
+    console.log('Response status:', response.status);
+    console.log('Response headers:', response.headers.raw());
+
+    // Ler resposta
+    const data = await response.text();
+    console.log('Response data:', data);
+
+    // Configurar resposta
     res.status(response.status);
-    res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json');
+    
+    // Copiar headers relevantes
+    const contentType = response.headers.get('content-type');
+    if (contentType) {
+      res.setHeader('Content-Type', contentType);
+    }
+
     res.send(data);
 
   } catch (error) {
     console.error('Proxy error:', error);
-    res.status(500).json({ error: 'Erro no proxy: ' + error.message });
+    res.status(500).json({ 
+      error: 'Erro no proxy', 
+      message: error.message,
+      stack: error.stack
+    });
   }
 };
